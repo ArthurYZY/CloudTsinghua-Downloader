@@ -6,21 +6,37 @@ with open("conf.json", 'r') as f:
     content = json.load(f)
     file_id = content['id']
     ignore_ls = content['ignore']
+    if 'passwd' in content:
+        passwd = content['passwd']
+    else:
+        passwd = ""
+    
 
 FILE_ID = file_id
 IGNORE_LS = ignore_ls
 URL = f"https://cloud.tsinghua.edu.cn/api/v2.1/share-links/{FILE_ID}/dirents/"
 DOWNLOAD_URL = f"https://cloud.tsinghua.edu.cn/d/{FILE_ID}/files/"
+LOGIN_URL = f"https://cloud.tsinghua.edu.cn/d/{FILE_ID}/"
 
 total_file_ls = []
+client = requests.session()
+
+
+def login():
+    client.get(LOGIN_URL)
+    csrftoken = client.cookies['sfcsrftoken']
+    payload = {
+        'password': passwd,
+        'csrfmiddlewaretoken': csrftoken
+    }
+    client.post(LOGIN_URL, data=payload, headers=dict(Referer="https://cloud.tsinghua.edu.cn/"))
 
 def get_dirents(file_path: str=""):
     payload = { 'thumbnail_size': 48,
                 'path': '/' + file_path.strip('/')}
 
-    r = requests.get(URL, params=payload)
+    r = client.get(URL, params=payload)
     content = json.loads(r.text)
-
     return content['dirent_list']
 
 
@@ -67,7 +83,7 @@ def download(name: str, folder: str):
     payloads = { 'p': folder + name,
                  'dl': 1}
 
-    r = requests.get(DOWNLOAD_URL, params=payloads, stream=True)
+    r = client.get(DOWNLOAD_URL, params=payloads, stream=True)
     download_path = make_path(folder)
 
     with open(download_path + name, "wb") as f:
@@ -90,4 +106,6 @@ def download_all(download_ls):
 
 
 if __name__ == "__main__":
+    if passwd:
+        login()
     download_all(get_download_ls())
